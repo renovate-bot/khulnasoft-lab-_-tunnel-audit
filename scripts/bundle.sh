@@ -1,0 +1,24 @@
+#!/bin/bash
+
+rm -rf bundle || true
+rm bundle.tar.gz || true
+RELEASE_VERSION=${GITHUB_REF/refs\/tags\/v/}
+MINOR_VERSION=$(echo ${RELEASE_VERSION} | cut -d. -f1,2)
+MAJOR_VERSION=$(echo ${RELEASE_VERSION} | cut -d. -f1)
+if [ -n "$GITHUB_ENV" ]; then
+  echo "RELEASE_VERSION=$RELEASE_VERSION" >> $GITHUB_ENV
+  echo "MINOR_VERSION=$MINOR_VERSION" >> $GITHUB_ENV
+  echo "MAJOR_VERSION=$MAJOR_VERSION" >> $GITHUB_ENV
+fi
+mkdir -p bundle/policies/{kubernetes,cloud,docker}/policies
+rsync -avr --exclude=README.md --exclude="*_test.rego" --exclude="*.go" --exclude=compliance --exclude=test --exclude=advanced checks/cloud/  bundle/policies/cloud/policies
+rsync -avr --exclude=README.md --exclude="*_test.rego" --exclude="*.go" --exclude=compliance --exclude=test --exclude=advanced checks/kubernetes/  bundle/policies/kubernetes/policies
+rsync -avr --exclude=README.md --exclude="*_test.rego" --exclude="*.go" --exclude=compliance --exclude=test --exclude=advanced checks/docker/  bundle/policies/docker/policies
+mkdir -p bundle/policies/{kubernetes,docker}/lib
+rsync -avr  --exclude="*_test.rego" --exclude="*.go" lib/kubernetes/* bundle/policies/kubernetes/lib
+rsync -avr  --exclude="*_test.rego" --exclude="*.go" lib/docker/* bundle/policies/docker/lib
+cp checks/.manifest bundle/
+rm bundle/policies/.manifest
+sed -i -e "s/\[GITHUB_SHA\]/${RELEASE_VERSION}/" bundle/.manifest
+tar -C bundle -czvf bundle.tar.gz .
+rm -rf bundle
